@@ -99,7 +99,7 @@ def normalize_data(data, nbit=16):
 
 def convolvehr(data, kernel, plotit=False, 
                rebin=4, norm=True, nbit=16, 
-               noise=True, cmap='afmhot'):
+               noise=True, cmap='turbo'):
     """ Take input data and 2D convolve with kernel 
     
     Parameters:
@@ -116,55 +116,57 @@ def convolvehr(data, kernel, plotit=False,
         ncolor = 3
     
     if noise:
-        data_noise = data + np.random.normal(0,1.5,data.shape)
+        data_noise = data + np.random.normal(0,5,data.shape)
     else:
         data_noise = data
 
-    dataLR = signal.fftconvolve(data_noise, kernel, mode='same')
+    # Normalize the kernel
+    # kernel = kernel / np.sum(kernel)
+    # print("KERNEL SHAPE", kernel.shape)
+
+    data_convolved = signal.fftconvolve(data_noise, kernel, mode='same')
 
     if norm is True:
-         dataLR = normalize_data(dataLR, nbit=nbit)
+         data_convolved = normalize_data(data_convolved, nbit=nbit)
          data = normalize_data(data, nbit=nbit)
 
-    dataLR = dataLR[rebin//2::rebin, rebin//2::rebin]
+    data_residual = data_convolved - data
+
+    data_restored = data_convolved - data_residual
+
+    dataLR = data_convolved[rebin//2::rebin, rebin//2::rebin]
 
     if plotit:
-        plt.figure()
-        dataLRflat = dataLR.flatten()
-        dataLRflat = dataLRflat[dataLRflat!=0]
-        dataflat = data.flatten()
-        dataflat = dataflat[dataflat!=0]
-        plt.hist(dataLRflat, color='C1', alpha=0.1, 
-                 density=True, log=True, bins=255)
-        plt.hist(dataflat, bins=255, color='C0', alpha=0.25, 
-                 density=True, log=True)
-        plt.title('Bit value distribution', fontsize=20)
-        plt.xlabel('Pixel value')
-        plt.ylabel('Number of pixels')
-        plt.legend(['Convolved','True'])
-        plt.figure()
-        if norm is False:
-            data = data.reshape(data.shape[0]//4,4,
-                                data.shape[-2]//4, 4, 
-                                ncolor).mean(1).mean(-2)
-            plt.imshow(dataLR[..., 0], cmap=cmap, 
-                        vmax=dataLR[..., 0].max()*0.10, vmin=0)
-        else:
-            plt.imshow(dataLR, vmax=dataLR[..., 0].max()*0.10, cmap=cmap)
-        plt.title('Convolved', fontsize=15)
-        plt.figure()
+        fig, axs = plt.subplots(1, 4, figsize=(18, 6))
+        fig.suptitle("Convolution Process", fontsize=20)
 
-        if norm is False:
-            plt.imshow(data_noise[..., 0], cmap=cmap, vmax=data_noise.max()*0.05, vmin=0)
-        else:
-            plt.imshow(data_noise, cmap=cmap,vmax=data_noise.max()*0.05, vmin=0)
-        plt.title('True', fontsize=15)
-        plt.figure()
-        plt.imshow(kernel[...,0],cmap='Greys',vmax=kernel[...,0].max()*0.35)
-        plt.title('Kernel / PSF', fontsize=20)
-        plt.show()
+        # Plot the original data
+        axs[0].imshow(data, cmap=cmap)
+        axs[0].set_title("Original Data (True)")
+        axs[0].axis('off')
 
-    return dataLR, data_noise
+        # Plot the convolved data
+        axs[1].imshow(data_convolved, cmap=cmap)
+        axs[1].set_title("Convolved Data (Dirty)")
+        axs[1].axis('off')
+
+        # Plot the downsampled (dataLR) result
+        # axs[2].imshow(dataLR, cmap=cmap)
+        # axs[2].set_title("Downsampled Data (dataLR)")
+        # axs[2].axis('off')
+
+        axs[2].imshow(data_residual, cmap=cmap)
+        axs[2].set_title(f"Residual [{data_residual.min():.4f},{data_residual.max():.4f}]\n(Dirty - True)")
+        axs[2].axis('off')
+
+        axs[3].imshow(data_restored, cmap=cmap)
+        axs[3].set_title(f"Data restored [{data_restored.min():.4f},{data_restored.max():.4f}]\n(Dirty - Residual)")
+        axs[3].axis('off')
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+        plt.savefig('./data_gen_debug.png')
+
+    return dataLR, data_noise, data_convolved
 
 def create_LR_image(fl, kernel, fdirout=None, 
                     galaxies=False, plotit=False, 
@@ -226,9 +228,10 @@ def create_LR_image(fl, kernel, fdirout=None,
 
     nbit = 'float'
     
-    fdiroutHR = options.fdout+'/POLISH_%s_HR/'%subset
-    fdiroutLR = options.fdout+'/POLISH_%s_LR_X%d/'%(subset,rebin)
-    fdiroutGalaxies = f"{fdirout}/galaxy_info/"
+    fdiroutHR = options.fdout+'/POLISH_%s_true/'%subset
+    fdiroutLR = options.fdout+'POLISH_%s_dirty_lowres_x%d'%(subset,rebin)
+    fdiroutLR_same_res = options.fdout+'POLISH_%s_dirty'%(subset)
+    fdiroutGalaxies = f"{options.fdout}/galaxy_info/"
     galaxy_info_file = f"{fdiroutGalaxies}/galaxies_{subset}.json"
 
     # Ensure output directory exists
@@ -243,9 +246,11 @@ def create_LR_image(fl, kernel, fdirout=None,
                 fnout = fn.strip('.png')+'-conv.npy'
             else:
                 fnoutLR = fdiroutLR + fn.split('/')[-1][:-4] + 'x%d.png' % rebin
+                fnoutLR_same_res = fdiroutLR_same_res + fn.split('/')[-1][:-4] + '.png'
         else:
             fn = '%04d.png'%(ii+nstart)
             fnoutLR = fdiroutLR + fn[:-4] + 'x%d.png' % rebin
+            fnoutLR_same_res = fdiroutLR_same_res + fn[:-4] + '.png'
 
         if os.path.isfile(fnoutLR):
             print("File exists, skipping %s"%fnoutLR)
@@ -332,7 +337,7 @@ def create_LR_image(fl, kernel, fdirout=None,
                 print("That didnt work")
                 pass
             
-        dataLR, data_noise = convolvehr(data, kernel_, plotit=plotit, 
+        dataLR, data_noise, data_convolved = convolvehr(data, kernel_, plotit=plotit, 
                                         rebin=rebin, norm=norm, nbit=nbit, 
                                         noise=True)
 
@@ -343,11 +348,21 @@ def create_LR_image(fl, kernel, fdirout=None,
 #        nlr = len(dataLR)
 #        dataLR = dataLR[int(0.25*nlr) : int(0.75*nlr), int(0.25*nlr) : int(0.75*nlr)]
 
+        print(f"Data {data.shape} before normalize: [{data.min()};{data.max()}]")
+        print(f"DataLR {dataLR.shape} before normalize: [{dataLR.min()};{dataLR.max()}]")
+        print(f"DataConvolved {data_convolved.shape} before normalize: [{data_convolved.min()};{data_convolved.max()}]")
+
         data = normalize_data(data, nbit=nbit)
         dataLR = normalize_data(dataLR, nbit=nbit)
+        data_convolved = normalize_data(data_convolved, nbit=nbit)
+
+        print(f"Data {data.shape} after normalize: [{data.min()};{data.max()}]")
+        print(f"DataLR {dataLR.shape} after normalize: [{dataLR.min()};{dataLR.max()}]")
+        print(f"DataConvolved {data_convolved.shape} after normalize: [{data_convolved.min()};{data_convolved.max()}]")
         
         if nbit=='float':
             np.save(fnoutLR[:-4], dataLR)
+            np.save(fnoutLR_same_res[:-4], data_convolved)
 
         if galaxies or sky:
             fnoutHR = fdiroutHR + fn.split('/')[-1][:-4] + '.png'
@@ -426,45 +441,59 @@ if __name__=='__main__':
     elif options.kernel.endswith('fits'):
         kernel, header, pixel_scale_psf, num_pix = readfits(options.kernel)
         nkern = len(kernel)
+
         kernel = kernel[nkern//2-options.ksize//2:nkern//2+options.ksize//2, 
                         nkern//2-options.ksize//2:nkern//2+options.ksize//2]
+        
         pixel_scale_psf *= 3600
         if abs((1-pixel_scale_psf/PIXEL_SIZE)) > 0.025:
             print("Stretching PSF by %0.3f to match map" % (pixel_scale_psf/PIXEL_SIZE))
             kernel = transform.rescale(kernel, pixel_scale_psf/PIXEL_SIZE)
+
+        
 
     # Input directory
     if options.fdirin is None:
         fdirinTRAIN = None
         fdirinVALID = None 
     else:
-        fdirinTRAIN = options.fdirin+'/POLISH_train_HR/'
-        fdirinVALID = options.fdirin+'/POLISH_valid_HR/'
+        fdirinTRAIN = options.fdirin+'/POLISH_train_true/'
+        fdirinVALID = options.fdirin+'/POLISH_valid_true/'
 
     # Output directories for training and validation. 
     # If they don't exist, create them
-    fdiroutTRAIN_HR = options.fdout+'/POLISH_train_HR'
-    fdiroutVALID_HR = options.fdout+'/POLISH_valid_HR'
-    fdiroutTRAIN_LR = options.fdout+'/POLISH_train_LR_X%d'%options.rebin
-    fdiroutVALID_LR = options.fdout+'/POLISH_valid_LR_X%d'%options.rebin
+    fdiroutTRAIN_HR = options.fdout+'/POLISH_train_true'
+    fdiroutVALID_HR = options.fdout+'/POLISH_valid_true'
+    fdiroutTRAIN_LR_same_res = options.fdout+'/POLISH_train_dirty'
+    fdiroutVALID_LR_same_res = options.fdout+'/POLISH_valid_dirty'
+    fdiroutTRAIN_LR = options.fdout+'/POLISH_train_dirty_lowres_x%d'%options.rebin
+    fdiroutVALID_LR = options.fdout+'/POLISH_valid_dirty_lowres_x%d'%options.rebin
     
     fdiroutPSF = options.fdout+'/psf/'
 
     if not os.path.isdir(fdiroutTRAIN_HR):
-        print("Making output training directory")
+        print("Making output training true sky directory")
         os.system('mkdir -p %s' % fdiroutTRAIN_HR)
 
     if not os.path.isdir(fdiroutTRAIN_LR):
-        print("Making output training directory")
+        print("Making output training dirty downscaled directory")
         os.system('mkdir -p %s' % fdiroutTRAIN_LR)
 
+    if not os.path.isdir(fdiroutTRAIN_LR_same_res):
+        print("Making output training dirty original size directory")
+        os.system('mkdir -p %s' % fdiroutTRAIN_LR_same_res)
+
     if not os.path.isdir(fdiroutVALID_HR):
-        print("Making output training directory")
+        print("Making output validation true sky directory")
         os.system('mkdir -p %s' % fdiroutVALID_HR)
 
     if not os.path.isdir(fdiroutVALID_LR):
-        print("Making output training directory")
+        print("Making output validation dirty downscaled directory")
         os.system('mkdir -p %s' % fdiroutVALID_LR)
+
+    if not os.path.isdir(fdiroutVALID_LR_same_res):
+        print("Making output validation dirty original size directory")
+        os.system('mkdir -p %s' % fdiroutVALID_LR_same_res)
 
     if not os.path.isdir(fdiroutPSF):
         print("Making output PSF directory")
