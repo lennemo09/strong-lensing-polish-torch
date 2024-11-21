@@ -166,7 +166,7 @@ def convolvehr(data, kernel, plotit=False,
         plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig('./data_gen_debug.png')
 
-    return dataLR, data_noise, data_convolved
+    return dataLR, data_noise, data_convolved, data_residual
 
 def create_LR_image(fl, kernel, fdirout=None, 
                     galaxies=False, plotit=False, 
@@ -229,8 +229,9 @@ def create_LR_image(fl, kernel, fdirout=None,
     nbit = 'float'
     
     fdiroutHR = options.fdout+'/POLISH_%s_true/'%subset
-    fdiroutLR = options.fdout+'POLISH_%s_dirty_lowres_x%d'%(subset,rebin)
-    fdiroutLR_same_res = options.fdout+'POLISH_%s_dirty'%(subset)
+    fdiroutLR = options.fdout+'/POLISH_%s_dirty_lowres_x%d/'%(subset,rebin)
+    fdiroutLR_same_res = options.fdout+'/POLISH_%s_dirty/'%(subset)
+    fdiroutResidual = options.fdout+'/POLISH_%s_residual/'%subset
     fdiroutGalaxies = f"{options.fdout}/galaxy_info/"
     galaxy_info_file = f"{fdiroutGalaxies}/galaxies_{subset}.json"
 
@@ -247,11 +248,12 @@ def create_LR_image(fl, kernel, fdirout=None,
             else:
                 fnoutLR = fdiroutLR + fn.split('/')[-1][:-4] + 'x%d.png' % rebin
                 fnoutLR_same_res = fdiroutLR_same_res + fn.split('/')[-1][:-4] + '.png'
+                fnoutResidual = fdiroutResidual + fn.split('/')[-1][:-4] + '.png'
         else:
             fn = '%04d.png'%(ii+nstart)
             fnoutLR = fdiroutLR + fn[:-4] + 'x%d.png' % rebin
             fnoutLR_same_res = fdiroutLR_same_res + fn[:-4] + '.png'
-
+            fnoutResidual = fdiroutResidual + fn[:-4] + '.png'
         if os.path.isfile(fnoutLR):
             print("File exists, skipping %s"%fnoutLR)
             continue
@@ -337,7 +339,7 @@ def create_LR_image(fl, kernel, fdirout=None,
                 print("That didnt work")
                 pass
             
-        dataLR, data_noise, data_convolved = convolvehr(data, kernel_, plotit=plotit, 
+        dataLR, data_noise, data_convolved, data_residual = convolvehr(data, kernel_, plotit=plotit, 
                                         rebin=rebin, norm=norm, nbit=nbit, 
                                         noise=True)
 
@@ -351,6 +353,7 @@ def create_LR_image(fl, kernel, fdirout=None,
         print(f"Data {data.shape} before normalize: [{data.min()};{data.max()}]")
         print(f"DataLR {dataLR.shape} before normalize: [{dataLR.min()};{dataLR.max()}]")
         print(f"DataConvolved {data_convolved.shape} before normalize: [{data_convolved.min()};{data_convolved.max()}]")
+        print(f"DataResidual {data_residual.shape} before normalize: [{data_residual.min()};{data_residual.max()}]")
 
         data = normalize_data(data, nbit=nbit)
         dataLR = normalize_data(dataLR, nbit=nbit)
@@ -359,10 +362,12 @@ def create_LR_image(fl, kernel, fdirout=None,
         print(f"Data {data.shape} after normalize: [{data.min()};{data.max()}]")
         print(f"DataLR {dataLR.shape} after normalize: [{dataLR.min()};{dataLR.max()}]")
         print(f"DataConvolved {data_convolved.shape} after normalize: [{data_convolved.min()};{data_convolved.max()}]")
+        print(f"DataResidual {data_residual.shape} after normalize: [{data_residual.min()};{data_residual.max()}]")
         
         if nbit=='float':
             np.save(fnoutLR[:-4], dataLR)
             np.save(fnoutLR_same_res[:-4], data_convolved)
+            np.save(fnoutResidual[:-4], data_residual)
 
         if galaxies or sky:
             fnoutHR = fdiroutHR + fn.split('/')[-1][:-4] + '.png'
@@ -468,6 +473,8 @@ if __name__=='__main__':
     fdiroutVALID_LR_same_res = options.fdout+'/POLISH_valid_dirty'
     fdiroutTRAIN_LR = options.fdout+'/POLISH_train_dirty_lowres_x%d'%options.rebin
     fdiroutVALID_LR = options.fdout+'/POLISH_valid_dirty_lowres_x%d'%options.rebin
+    fdiroutTRAIN_residual = options.fdout+'/POLISH_train_residual'
+    fdiroutVALID_residual = options.fdout+'/POLISH_valid_residual'
     
     fdiroutPSF = options.fdout+'/psf/'
 
@@ -494,6 +501,14 @@ if __name__=='__main__':
     if not os.path.isdir(fdiroutVALID_LR_same_res):
         print("Making output validation dirty original size directory")
         os.system('mkdir -p %s' % fdiroutVALID_LR_same_res)
+
+    if not os.path.isdir(fdiroutTRAIN_residual):
+        print("Making output training residual directory")
+        os.system('mkdir -p %s' % fdiroutTRAIN_residual)
+
+    if not os.path.isdir(fdiroutVALID_residual):
+        print("Making output validation residual directory")
+        os.system('mkdir -p %s' % fdiroutVALID_residual)
 
     if not os.path.isdir(fdiroutPSF):
         print("Making output PSF directory")
