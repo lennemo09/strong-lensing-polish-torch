@@ -350,19 +350,19 @@ def create_LR_image(fl, kernel, fdirout=None,
 #        nlr = len(dataLR)
 #        dataLR = dataLR[int(0.25*nlr) : int(0.75*nlr), int(0.25*nlr) : int(0.75*nlr)]
 
-        print(f"Data {data.shape} before normalize: [{data.min()};{data.max()}]")
-        print(f"DataLR {dataLR.shape} before normalize: [{dataLR.min()};{dataLR.max()}]")
-        print(f"DataConvolved {data_convolved.shape} before normalize: [{data_convolved.min()};{data_convolved.max()}]")
-        print(f"DataResidual {data_residual.shape} before normalize: [{data_residual.min()};{data_residual.max()}]")
+        # print(f"Data {data.shape} before normalize: [{data.min()};{data.max()}]")
+        # print(f"DataLR {dataLR.shape} before normalize: [{dataLR.min()};{dataLR.max()}]")
+        # print(f"DataConvolved {data_convolved.shape} before normalize: [{data_convolved.min()};{data_convolved.max()}]")
+        # print(f"DataResidual {data_residual.shape} before normalize: [{data_residual.min()};{data_residual.max()}]")
 
         data = normalize_data(data, nbit=nbit)
         dataLR = normalize_data(dataLR, nbit=nbit)
         data_convolved = normalize_data(data_convolved, nbit=nbit)
 
-        print(f"Data {data.shape} after normalize: [{data.min()};{data.max()}]")
-        print(f"DataLR {dataLR.shape} after normalize: [{dataLR.min()};{dataLR.max()}]")
-        print(f"DataConvolved {data_convolved.shape} after normalize: [{data_convolved.min()};{data_convolved.max()}]")
-        print(f"DataResidual {data_residual.shape} after normalize: [{data_residual.min()};{data_residual.max()}]")
+        # print(f"Data {data.shape} after normalize: [{data.min()};{data.max()}]")
+        # print(f"DataLR {dataLR.shape} after normalize: [{dataLR.min()};{dataLR.max()}]")
+        # print(f"DataConvolved {data_convolved.shape} after normalize: [{data_convolved.min()};{data_convolved.max()}]")
+        # print(f"DataResidual {data_residual.shape} after normalize: [{data_residual.min()};{data_residual.max()}]")
         
         if nbit=='float':
             np.save(fnoutLR[:-4], dataLR)
@@ -380,7 +380,7 @@ def create_LR_image(fl, kernel, fdirout=None,
 
         with open(galaxy_info_file, 'w') as f:
             json.dump(galaxy_info, f, indent=4)
-        print(f"Saved galaxy information to {galaxy_info_file}")
+        # print(f"Saved galaxy information to {galaxy_info_file}")
  
 if __name__=='__main__':
     """
