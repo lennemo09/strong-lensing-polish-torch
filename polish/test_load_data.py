@@ -397,8 +397,8 @@ def main(datadir, scale=2, model_name=None, psf=False):
     
     # Load datasets
     if scale != 1:
-        train_dataset = SuperResolutionDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_dirty_lowres_x%d/' % (datadir,scale), 0, 799, scale_factor=scale)
-        val_dataset = SuperResolutionDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_dirty_lowres_x%d/' % (datadir, scale), 800, 899, scale_factor=scale)
+        train_dataset = SuperResolutionDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_dirty_lowres_x%d/' % (datadir,scale), 0, 799, scale_factor=scale, crop_size=512)
+        val_dataset = SuperResolutionDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_dirty_lowres_x%d/' % (datadir, scale), 800, 899, scale_factor=scale, crop_size=512)
         print(f'Scale factor: {scale}')
         print(f"Loading train data from: {'%s/POLISH_train_true/' % datadir} and {'%s/POLISH_train_dirty_lowres_x%d/' % (datadir,scale)}")
         print(f"Loading validation data from: {'%s/POLISH_valid_true/' % datadir} and {'%s/POLISH_valid_dirty_lowres_x%d/' % (datadir, scale)}")

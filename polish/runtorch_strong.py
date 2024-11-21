@@ -289,11 +289,11 @@ def save_validation_results(model, val_loader, device, psf, output_dir, num_samp
     fig, axes = plt.subplots(num_samples, 4, figsize=(15, 3 * num_samples))
     for idx, (lr_img, sr_img, hr_img, psnr) in enumerate(samples):
         axes[idx, 0].imshow(lr_img.squeeze(), cmap='gray')
-        axes[idx, 0].set_title("Input")
+        axes[idx, 0].set_title(f"Input ({lr_img.squeeze().shape})")
         axes[idx, 0].axis('off')
 
         axes[idx, 1].imshow(sr_img.squeeze(), cmap='gray')
-        axes[idx, 1].set_title("Predicted")
+        axes[idx, 1].set_title(f"Predicted ({sr_img.squeeze().shape})")
         axes[idx, 1].axis('off')
 
         axes[idx, 2].imshow(hr_img.squeeze(), cmap='gray')
@@ -395,16 +395,17 @@ def main(datadir, scale=2, model_name=None, psf=False):
     val_psnr = []
     plot_save_path = output_dir + 'training_metrics.png'
     
+    crop_size = 512 
     # Load datasets
     if scale != 1:
-        train_dataset = SuperResolutionDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_dirty_lowres_x%d/' % (datadir,scale), 0, 799, scale_factor=scale)
-        val_dataset = SuperResolutionDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_dirty_lowres_x%d/' % (datadir, scale), 800, 899, scale_factor=scale)
+        train_dataset = SuperResolutionDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_dirty_lowres_x%d/' % (datadir,scale), 0, 799, scale_factor=scale, crop_size=crop_size)
+        val_dataset = SuperResolutionDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_dirty_lowres_x%d/' % (datadir, scale), 800, 899, scale_factor=scale, crop_size=crop_size)
         print(f'Scale factor: {scale}')
         print(f"Loading train data from: {'%s/POLISH_train_true/' % datadir} and {'%s/POLISH_train_dirty_lowres_x%d/' % (datadir,scale)}")
         print(f"Loading validation data from: {'%s/POLISH_valid_true/' % datadir} and {'%s/POLISH_valid_dirty_lowres_x%d/' % (datadir, scale)}")
     else:
-        train_dataset = SuperResolutionDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_dirty/' % (datadir), 0, 799, scale_factor=scale)
-        val_dataset = SuperResolutionDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_dirty/' % (datadir), 800, 899, scale_factor=scale)
+        train_dataset = SuperResolutionDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_dirty/' % (datadir), 0, 799, scale_factor=scale, crop_size=crop_size)
+        val_dataset = SuperResolutionDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_dirty/' % (datadir), 800, 899, scale_factor=scale, crop_size=crop_size)
         print(f'Scale factor: {scale}')
         print(f"Loading train data from: {'%s/POLISH_train_true/' % datadir} and {'%s/POLISH_train_dirty/' % (datadir)}")
         print(f"Loading validation data from: {'%s/POLISH_valid_true/' % datadir} and {'%s/POLISH_valid_dirty/' % (datadir)}")
@@ -438,7 +439,7 @@ def main(datadir, scale=2, model_name=None, psf=False):
             save_validation_results(model, val_loader, device, psf=psfarr, output_dir=output_dir)
             
     # Save the final model and plot
-    torch.save(model.state_dict(), output_dir + + f'final_model.pth')
+    torch.save(model.state_dict(), output_dir + f'final_model.pth')
     save_training_plot(train_losses, val_losses, val_psnr, plot_save_path)
 
 
