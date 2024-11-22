@@ -364,24 +364,24 @@ def save_validation_results(model, val_loader, device, psf, output_dir, reconstr
     # Create the plot
     fig, axes = plt.subplots(num_samples, 6, figsize=(25, 3 * num_samples))
     for idx, (lr_img, sr_img, res_img, reconstructed_img, hr_img, psnr) in enumerate(samples):
-        axes[idx, 0].imshow(lr_img.squeeze(), cmap='gray')
-        axes[idx, 0].set_title(f"Input ({lr_img.squeeze().shape})")
+        axes[idx, 0].imshow(lr_img.squeeze(), cmap='gray', vmin = 0, vmax = 1)
+        axes[idx, 0].set_title(f"Input ({lr_img.squeeze().min():.5f},{lr_img.squeeze().max():.5f})")
         axes[idx, 0].axis('off')
 
-        axes[idx, 1].imshow(sr_img.squeeze(), cmap='gray')
+        axes[idx, 1].imshow(sr_img.squeeze(), cmap='spectral', vmin = -1, vmax = 1)
         axes[idx, 1].set_title(f"Predicted residal ({sr_img.squeeze().min():.5f},{sr_img.squeeze().max():.5f})")
         axes[idx, 1].axis('off')
 
-        axes[idx, 2].imshow(res_img.squeeze(), cmap='gray')
+        axes[idx, 2].imshow(res_img.squeeze(), cmap='spectral', vmin = -1, vmax = 1)
         axes[idx, 2].set_title(f"True residal ({res_img.squeeze().min():.5f},{res_img.squeeze().max():.5f})")
         axes[idx, 2].axis('off')
 
-        axes[idx, 3].imshow(reconstructed_img.squeeze(), cmap='gray')
-        axes[idx, 3].set_title(f"Reconstruct from residual ({reconstructed_img.squeeze().shape})")
+        axes[idx, 3].imshow(reconstructed_img.squeeze(), cmap='gray', vmin = 0, vmax = 1)
+        axes[idx, 3].set_title(f"Reconstruct from residual ({reconstructed_img.squeeze().min():.5f},{reconstructed_img.squeeze().max():.5f})")
         axes[idx, 3].axis('off')
 
-        axes[idx, 4].imshow(hr_img.squeeze(), cmap='gray')
-        axes[idx, 4].set_title("True")
+        axes[idx, 4].imshow(hr_img.squeeze(), cmap='gray', vmin = 0, vmax = 1)
+        axes[idx, 4].set_title(f"True ({hr_img.squeeze().min():.5f},{hr_img.squeeze().max():.5f})")
         axes[idx, 4].axis('off')
 
         axes[idx, 5].text(0.5, 0.5, f"PSNR residual vs residual: {psnr:.2f} dB" if not reconstruct_loss else f"PSNR Isky^ vs Isky: {psnr:.2f} dB" , ha='center', va='center', fontsize=12)
