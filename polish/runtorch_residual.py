@@ -184,10 +184,11 @@ class SuperResolutionDataset(Dataset):
 
 
 class ResidualLearningDataset(Dataset):
-    def __init__(self, hr_dir, residual_dr, lr_dir, start_num, end_num,
+    def __init__(self, hr_dir, residual_dr, lr_dir, start_num, end_num, nbit=0,
                  crop_size=512):
         self.hr_dir = hr_dir
         self.lr_dir = lr_dir
+        self.nbit = nbit
         self.residual_dir = residual_dr
         self.image_files = [f"{i:04d}.npy" for i in range(start_num, end_num + 1)]
         self.crop_size = crop_size
@@ -204,19 +205,24 @@ class ResidualLearningDataset(Dataset):
         lr_image = np.load(os.path.join(self.lr_dir, img_name))
         residual_image = np.load(os.path.join(self.residual_dir, img_name))
 
+        if self.nbit > 0:
+            max_value = (2**(nbit//2)-1)
+            hr_image = hr_image * max_value
+            lr_image = lr_image * max_value
+            residual_image = residual_image * max_value
+
         hr_image = torch.from_numpy(hr_image).squeeze()
         lr_image = torch.from_numpy(lr_image).squeeze()
         residual_image = torch.from_numpy(residual_image).squeeze()
-        
+
         # Random crop
         i, j, h, w = transforms.RandomCrop.get_params(hr_image, output_size=(self.crop_size, self.crop_size))
         hr_image = TF.crop(hr_image, i, j, h, w)
         lr_image = TF.crop(lr_image, i, j, h, w)
         residual_image = TF.crop(residual_image, i, j, h, w)
-        
-        # Convert to numpy array and normalize
-        hr_image = np.array(hr_image).astype(np.float32) #/ float(hr_image.max())  # Normalize 16-bit to [0, 1]
-        lr_image = np.array(lr_image).astype(np.float32) #/ float(lr_image.max())
+
+        hr_image = np.array(hr_image).astype(np.float32) 
+        lr_image = np.array(lr_image).astype(np.float32)
         residual_image = np.array(residual_image).astype(np.float32)
         
         # Convert to tensor
@@ -317,7 +323,7 @@ def calculate_psnr(img1, img2):
     psnr = 20 * np.log10(max_pixel / np.sqrt(mse))
     return psnr  
 
-def save_validation_results(model, val_loader, device, psf, output_dir, reconstruct_loss=False, num_samples=5):
+def save_validation_results(model, val_loader, device, psf, output_dir, reconstruct_loss=False, num_samples=8):
     """
     Save validation results, including input images, predicted images, true images, and PSNR.
     inputs:
@@ -344,7 +350,7 @@ def save_validation_results(model, val_loader, device, psf, output_dir, reconstr
                     psnr = calculate_psnr(
                        reconstructed_img, hr_imgs[i].cpu().numpy()
                     )
-                    samples.append((lr_imgs[i].cpu(), sr_imgs[i].cpu(), res_imgs, reconstructed_img, hr_imgs[i].cpu(), psnr))
+                    samples.append((lr_imgs[i].cpu(), sr_imgs[i].cpu(), res_imgs[i].cpu(), reconstructed_img, hr_imgs[i].cpu(), psnr))
                     if len(samples) >= num_samples:
                         break
                 if len(samples) >= num_samples:
@@ -362,25 +368,29 @@ def save_validation_results(model, val_loader, device, psf, output_dir, reconstr
                     break
 
     # Create the plot
-    fig, axes = plt.subplots(num_samples, 6, figsize=(25, 3 * num_samples))
+    fig, axes = plt.subplots(num_samples, 6, figsize=(20, 3 * num_samples))
     for idx, (lr_img, sr_img, res_img, reconstructed_img, hr_img, psnr) in enumerate(samples):
-        axes[idx, 0].imshow(lr_img.squeeze(), cmap='gray', vmin = 0, vmax = 1)
+        max_im = max([lr_img.squeeze().max(), reconstructed_img.squeeze().max(), hr_img.squeeze().max()])
+        min_im = min([lr_img.squeeze().min(), reconstructed_img.squeeze().min(), hr_img.squeeze().min()])
+        max_res = max([sr_img.squeeze().max(), res_img.squeeze().max()])
+        min_res = min([sr_img.squeeze().min(), res_img.squeeze().min()])
+        axes[idx, 0].imshow(lr_img.squeeze(), cmap='gray', vmin = min_im, vmax = max_im)
         axes[idx, 0].set_title(f"Input ({lr_img.squeeze().min():.5f},{lr_img.squeeze().max():.5f})")
         axes[idx, 0].axis('off')
 
-        axes[idx, 1].imshow(sr_img.squeeze(), cmap='spectral', vmin = -1, vmax = 1)
+        axes[idx, 1].imshow(sr_img.squeeze(), cmap='Spectral', vmin = min_res, vmax = max_res)
         axes[idx, 1].set_title(f"Predicted residal ({sr_img.squeeze().min():.5f},{sr_img.squeeze().max():.5f})")
         axes[idx, 1].axis('off')
 
-        axes[idx, 2].imshow(res_img.squeeze(), cmap='spectral', vmin = -1, vmax = 1)
+        axes[idx, 2].imshow(res_img.squeeze(), cmap='Spectral', vmin = min_res, vmax = max_res)
         axes[idx, 2].set_title(f"True residal ({res_img.squeeze().min():.5f},{res_img.squeeze().max():.5f})")
         axes[idx, 2].axis('off')
 
-        axes[idx, 3].imshow(reconstructed_img.squeeze(), cmap='gray', vmin = 0, vmax = 1)
+        axes[idx, 3].imshow(reconstructed_img.squeeze(), cmap='gray', vmin = min_im, vmax = max_im)
         axes[idx, 3].set_title(f"Reconstruct from residual ({reconstructed_img.squeeze().min():.5f},{reconstructed_img.squeeze().max():.5f})")
         axes[idx, 3].axis('off')
 
-        axes[idx, 4].imshow(hr_img.squeeze(), cmap='gray', vmin = 0, vmax = 1)
+        axes[idx, 4].imshow(hr_img.squeeze(), cmap='gray', vmin = min_im, vmax = max_im)
         axes[idx, 4].set_title(f"True ({hr_img.squeeze().min():.5f},{hr_img.squeeze().max():.5f})")
         axes[idx, 4].axis('off')
 
@@ -389,7 +399,7 @@ def save_validation_results(model, val_loader, device, psf, output_dir, reconstr
 
     plt.tight_layout()
     results_path = os.path.join(output_dir, "validation_results.png")
-    plt.savefig(results_path)
+    plt.savefig(results_path, dpi=300)
     plt.close()
     print(f"Validation results saved to {results_path}")
 
@@ -440,7 +450,7 @@ def save_training_plot(train_losses, val_losses, val_psnr, save_path):
     print(f"Training plot saved to {save_path}")
 
 
-def main(datadir, reconstruct_loss, model_name=None, psf=False):
+def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     scale = 1 # keep same size to learn residuals
@@ -486,8 +496,8 @@ def main(datadir, reconstruct_loss, model_name=None, psf=False):
     if scale != 1:
         print("Can't use scale != for residual learning.")
     else:
-        train_dataset = ResidualLearningDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_residual/' % datadir, '%s/POLISH_train_dirty/' % (datadir), 0, 799, crop_size=crop_size)
-        val_dataset = ResidualLearningDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_residual/' % datadir, '%s/POLISH_valid_dirty/' % (datadir), 800, 899, crop_size=crop_size)
+        train_dataset = ResidualLearningDataset('%s/POLISH_train_true/' % datadir, '%s/POLISH_train_residual/' % datadir, '%s/POLISH_train_dirty/' % (datadir), 0, 799, nbit=nbit, crop_size=crop_size)
+        val_dataset = ResidualLearningDataset('%s/POLISH_valid_true/' % datadir, '%s/POLISH_valid_residual/' % datadir, '%s/POLISH_valid_dirty/' % (datadir), 800, 899, nbit=nbit, crop_size=crop_size)
         print(f'Scale factor: {scale}')
         print(f"Loading train data from: {'%s/POLISH_train_residual/' % datadir} and {'%s/POLISH_train_dirty/' % (datadir)}")
         print(f"Loading validation data from: {'%s/POLISH_valid_residual/' % datadir} and {'%s/POLISH_valid_dirty/' % (datadir)}")
@@ -528,5 +538,9 @@ def main(datadir, reconstruct_loss, model_name=None, psf=False):
 
 if __name__=='__main__':
     reconstruct_loss = int(sys.argv[2]) == 1
-    print(f'argv[1]: {sys.argv[1]}, reconstruct loss: {reconstruct_loss}')
-    main(sys.argv[1], reconstruct_loss, model_name=None)
+    try:
+        nbit = int(sys.argv[3])
+    except:
+        nbit = 0
+    print(f'argv[1]: {sys.argv[1]}, reconstruct loss: {reconstruct_loss}, nbit: {nbit}')
+    main(sys.argv[1], reconstruct_loss, nbit, model_name=None)
