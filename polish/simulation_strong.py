@@ -203,6 +203,8 @@ class SimRadioGal:
                     'yind': self.yind,
                     'theta_E': theta_E,
                     'flux': self.flux,
+                    'alpha_x': alpha_x,
+                    'alpha_y': alpha_y,
                     'beta_x': beta_x,
                     'beta_y': beta_y
                 })
