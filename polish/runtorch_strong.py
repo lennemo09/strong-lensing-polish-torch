@@ -361,7 +361,7 @@ def main(datadir, scale=2, model_name=None, psf=False):
     
     # Hyperparameters
     num_epochs = 150
-    batch_size = 10
+    batch_size = 4
     learning_rate = 0.0001
 
     output_dir = f'./runs/final_data/temp_run/'

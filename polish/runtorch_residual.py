@@ -1,5 +1,3 @@
-
-
 import sys
 
 import torch
@@ -457,7 +455,7 @@ def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
 
     # Hyperparameters
     num_epochs = 150
-    batch_size = 10
+    batch_size = 4
     learning_rate = 0.0001
 
     output_dir = f'./runs/final_data/temp_run/'
@@ -491,7 +489,7 @@ def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
     val_psnr = []
     plot_save_path = output_dir + 'training_metrics.png'
     
-    crop_size = 256 
+    crop_size = 512 
     # Load datasets
     if scale != 1:
         print("Can't use scale != for residual learning.")
