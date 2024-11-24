@@ -2,3 +2,6 @@
 *~
 *.lock
 runs/*.pth
+eval/*
+runs/*
+*.pyc
