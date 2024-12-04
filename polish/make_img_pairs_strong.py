@@ -266,7 +266,7 @@ def create_LR_image(fl, kernel, fdirout=None,
             data = np.zeros([Nx,Ny])
 
             # Get number of sources in this simulated image
-            nsrc = np.random.poisson(int(src_density*(Nx*Ny*PIXEL_SIZE**2/60.**2)))
+            nsrc = np.random.poisson(int(src_density*(Nx*Ny*PIXEL_SIZE**2/60.**2))) # arcmin, number of galaxies in image
             fdirgalparams = fdirout+'/galparams/'
             if not os.path.isdir(fdirgalparams):
                 os.system('mkdir %s' % fdirgalparams)
