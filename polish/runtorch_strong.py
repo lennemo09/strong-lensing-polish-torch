@@ -356,26 +356,59 @@ def save_training_plot(train_losses, val_losses, val_psnr, save_path):
     print(f"Training plot saved to {save_path}")
 
 
-def main(datadir, scale=2, model_name=None, psf=False):
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+def get_available_memory(device_index):
+    """
+    Returns the available memory on the specified GPU in GB.
+    """
+    torch.cuda.empty_cache()  # Clear unused cached memory
+    memory_stats = torch.cuda.memory_stats(device_index)
+    allocated = memory_stats["allocated_bytes.all.current"] / (1024 ** 3)  # Convert to GB
+    reserved = memory_stats["reserved_bytes.all.current"] / (1024 ** 3)    # Convert to GB
+    total_memory = torch.cuda.get_device_properties(device_index).total_memory / (1024 ** 3)  # Convert to GB
+    available_memory = total_memory - max(allocated, reserved)
+    return available_memory
+
+
+def main(datadir, scale=1, model_name=None, psf=False):
+    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
     
     # Hyperparameters
     num_epochs = 500
     batch_size = 4
     learning_rate = 0.0001
 
-    output_dir = f'./runs/final_data/temp_run/'
+    output_dir = f'./runs/final_data/temp_run_strong/'
     os.makedirs(output_dir, exist_ok=True) 
 
     print("Output will be saved to:", output_dir)
 
     if psf:
-        model = WDSRpsf(scale_factor=scale).to(device)
+        model = WDSRpsf(scale_factor=1).to(device)
         psfarr = np.load(f'{datadir}/psf/psf_ideal.npy')
         npsf = len(psfarr)
         psfarr = psfarr[npsf//2-256:npsf//2+256, npsf//2-256:npsf//2+256]
         psfarr = psfarr[None,None] * np.ones([batch_size,1,1,1])
         psfarr = torch.from_numpy(psfarr).to(device).float()
+
+        psf_to_save = psfarr[0, 0].detach().cpu()  # Extract the 2D PSF and move it to CPU if needed
+        psf_np = psf_to_save.numpy()  # Convert the tensor to a NumPy array
+
+        # Normalize PSF values to 0-255 for saving as an 8-bit PNG
+        psf_normalized = (psf_np - psf_np.min()) / (psf_np.max() - psf_np.min()) * 255
+        psf_image = Image.fromarray(psf_normalized.astype('uint8'))  # Convert to 8-bit image
+        psf_image.save(f'{output_dir}psf.png')  # Save as PNG
+
+        psf_log = np.log10(psf_normalized)
+
+        # Plot the log-scaled PSF
+        plt.figure(figsize=(6, 6))
+        plt.imshow(psf_log, cmap='viridis')
+        plt.title('Log-Scaled PSF')
+        plt.axis('off')  # Optional: turn off the axes
+
+        # Save the figure
+        plt.savefig(f'{output_dir}psf_log_scale.png', bbox_inches='tight', pad_inches=0)
+        plt.close()
     else:
         model = WDSR(scale_factor=scale).to(device)
         psfarr = None
@@ -433,8 +466,8 @@ def main(datadir, scale=2, model_name=None, psf=False):
             best_val_psnr = avg_psnr
             torch.save(model.state_dict(), output_dir + f'best_psnr_model.pth')
 
-        # Save metrics plot every 10 epochs
-        if (epoch + 1) % 5 == 0:
+        # Save metrics plot every 5 epochs
+        if (epoch) % 2 == 0:
             save_training_plot(train_losses, val_losses, val_psnr, plot_save_path)
             save_validation_results(model, val_loader, device, psf=psfarr, output_dir=output_dir)
             
@@ -449,5 +482,10 @@ if __name__=='__main__':
     except:
         model_name = None
 
-    print(f'argv[1]: {sys.argv[1]}, argv[2]: {int(sys.argv[2])}')
-    main(sys.argv[1], int(sys.argv[2]), model_name=model_name)
+    try:
+        use_psf = int(sys.argv[3])
+    except:
+        use_psf = 0
+
+    print(f'argv[1]: {sys.argv[1]}, scale: argv[2]: {int(sys.argv[2])}')
+    main(sys.argv[1], int(sys.argv[2]), model_name=None, psf=(use_psf==1))

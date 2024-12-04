@@ -471,10 +471,25 @@ def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
         psfarr = psfarr[None,None] * np.ones([batch_size,1,1,1])
         psfarr = torch.from_numpy(psfarr).to(device).float()
 
-        psf_to_save = psfarr[0, 0]  # Extract the 2D PSF array from the batch
-        psf_normalized = (psf_to_save - psf_to_save.min()) / (psf_to_save.max() - psf_to_save.min()) * 255
+        psf_to_save = psfarr[0, 0].detach().cpu()  # Extract the 2D PSF and move it to CPU if needed
+        psf_np = psf_to_save.numpy()  # Convert the tensor to a NumPy array
+
+        # Normalize PSF values to 0-255 for saving as an 8-bit PNG
+        psf_normalized = (psf_np - psf_np.min()) / (psf_np.max() - psf_np.min()) * 255
         psf_image = Image.fromarray(psf_normalized.astype('uint8'))  # Convert to 8-bit image
         psf_image.save(f'{output_dir}psf.png')  # Save as PNG
+
+        psf_log = np.log10(psf_normalized)
+
+        # Plot the log-scaled PSF
+        plt.figure(figsize=(6, 6))
+        plt.imshow(psf_log, cmap='viridis')
+        plt.title('Log-Scaled PSF')
+        plt.axis('off')  # Optional: turn off the axes
+
+        # Save the figure
+        plt.savefig(f'{output_dir}psf_log_scale.png', bbox_inches='tight', pad_inches=0)
+        plt.close()
     else:
         model = WDSR(scale_factor=1).to(device)
         psfarr = None
