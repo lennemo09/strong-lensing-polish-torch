@@ -454,7 +454,7 @@ def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
     scale = 1 # keep same size to learn residuals
 
     # Hyperparameters
-    num_epochs = 150
+    num_epochs = 500
     batch_size = 4
     learning_rate = 0.0001
 
@@ -465,11 +465,16 @@ def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
 
     if psf:
         model = WDSRpsf(scale_factor=1).to(device)
-        psfarr = np.load('./data/exampleLWA1024x2/psf/psf_ideal.npy')
+        psfarr = np.load(f'{datadir}/psf/psf_ideal.npy')
         npsf = len(psfarr)
         psfarr = psfarr[npsf//2-256:npsf//2+256, npsf//2-256:npsf//2+256]
         psfarr = psfarr[None,None] * np.ones([batch_size,1,1,1])
         psfarr = torch.from_numpy(psfarr).to(device).float()
+
+        psf_to_save = psfarr[0, 0]  # Extract the 2D PSF array from the batch
+        psf_normalized = (psf_to_save - psf_to_save.min()) / (psf_to_save.max() - psf_to_save.min()) * 255
+        psf_image = Image.fromarray(psf_normalized.astype('uint8'))  # Convert to 8-bit image
+        psf_image.save(f'{output_dir}psf.png')  # Save as PNG
     else:
         model = WDSR(scale_factor=1).to(device)
         psfarr = None
@@ -536,9 +541,17 @@ def main(datadir, reconstruct_loss, nbit, model_name=None, psf=False):
 
 if __name__=='__main__':
     reconstruct_loss = int(sys.argv[2]) == 1
+
     try:
         nbit = int(sys.argv[3])
     except:
         nbit = 0
+
+    try:
+        use_psf = int(sys.argv[4])
+    except:
+        use_psf = 0
+
+    # python polish/runtorch_residual.py /scratch/ondemand28/len/data/DSA_PSF_1024_x2_stronglens/ 16 1
     print(f'argv[1]: {sys.argv[1]}, reconstruct loss: {reconstruct_loss}, nbit: {nbit}')
-    main(sys.argv[1], reconstruct_loss, nbit, model_name=None)
+    main(sys.argv[1], reconstruct_loss, nbit, psf=(use_psf==1), model_name=None)

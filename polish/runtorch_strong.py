@@ -360,7 +360,7 @@ def main(datadir, scale=2, model_name=None, psf=False):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
     # Hyperparameters
-    num_epochs = 150
+    num_epochs = 500
     batch_size = 4
     learning_rate = 0.0001
 
@@ -371,7 +371,7 @@ def main(datadir, scale=2, model_name=None, psf=False):
 
     if psf:
         model = WDSRpsf(scale_factor=scale).to(device)
-        psfarr = np.load('./data/exampleLWA1024x2/psf/psf_ideal.npy')
+        psfarr = np.load(f'{datadir}/psf/psf_ideal.npy')
         npsf = len(psfarr)
         psfarr = psfarr[npsf//2-256:npsf//2+256, npsf//2-256:npsf//2+256]
         psfarr = psfarr[None,None] * np.ones([batch_size,1,1,1])
@@ -386,7 +386,7 @@ def main(datadir, scale=2, model_name=None, psf=False):
     # Loss function and optimizer
     criterion = nn.MSELoss()
     optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=10)
+    scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.5, patience=15)
 
     best_val_loss = float('inf')
     best_val_psnr = 0.0
